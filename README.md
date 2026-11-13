@@ -66,19 +66,27 @@ python3 draw_arch.py
 ./show_arch.sh
 (Optional) Add a shell shortcut so you can run it anytime by typing arch:
 echo 'alias arch="$(pwd)/show_arch.sh"' >> ~/.zshrc && source ~/.zshrc
-├── Risc_5pkg.vhdl           # Custom ALU operation and data-size type packages
-├── Top_level.vhdl           # Top-level processor structural wiring
-├── PC_logic.vhdl            # Program Counter and branch/jump target logic
-├── instruction_memory.vhdl  # Instruction ROM (auto-populated by demo.py)
-├── fetch.vhdl               # Instruction fetch stage
-├── Decoder.vhdl             # Instruction field decoder & immediate generator
-├── Control_unit.vhdl        # Main control signal decoder
-├── Register_file.vhdl       # 32x32-bit register file (reg_mm)
-├── alu.vhdl                 # 32-bit Arithmetic Logic Unit
-├── Branch_ctrl.vhdl         # Branch condition evaluator
-├── DATA_MEMORY.vhdl         # Data RAM module
-├── tb_riscv.vhdl            # Clock/reset simulation testbench
-├── demo.py                  # Interactive RV32I assembler & GHDL simulation runner
-├── draw_arch.py             # Graphviz textbook block diagram generator
-└── show_arch.sh             # Live schematic generator (aliased as `arch`)
+## Repository Structure
 
+### 1. Core Hardware (VHDL-2008)
+| File | Entity | Role |
+| :--- | :--- | :--- |
+| `Top_level.vhdl` | `top_level` | Structural top-level wiring and writeback multiplexer |
+| `Risc_5pkg.vhdl` | `Alu_ip`, `Data_type` | Custom type definitions for ALU opcodes and memory data sizes |
+| `PC_logic.vhdl` | `PC_logic` | Program Counter (`pc`) register and branch/jump target calculation |
+| `instruction_memory.vhdl` | `Instruction_mm` | 1024-byte instruction ROM (auto-updated by `demo.py`) |
+| `fetch.vhdl` | `fetch` | Instruction fetch buffer |
+| `Decoder.vhdl` | `Instruction_decoder` | Instruction field slicer and sign-extended immediate generator |
+| `Control_unit.vhdl` | `Control_unit` | Main opcode/funct decoder generating datapath control signals |
+| `Register_file.vhdl` | `Register_b` | 32 × 32-bit general-purpose register bank (`reg_mm`) |
+| `alu.vhdl` | `alu` | 32-bit Arithmetic Logic Unit |
+| `Branch_ctrl.vhdl` | `branch` | Conditional branch comparator (`beq`, `bne`, `blt`, `bge`, etc.) |
+| `DATA_MEMORY.vhdl` | `Data_mm` | Byte-addressable data RAM with byte/half/word sign/zero extension |
+
+### 2. Verification & Automation Tools
+| File | Language | Purpose |
+| :--- | :--- | :--- |
+| `tb_riscv.vhdl` | VHDL | Simulation testbench generating clock and reset stimulus |
+| `demo.py` | Python | Interactive RV32I assembler, GHDL simulation runner, and register dumper |
+| `draw_arch.py` | Python | Generates the 4-stage textbook block diagram (`riscv_block_diagram.svg`) |
+| `show_arch.sh` | Bash | Synthesizes live RTL schematics via Yosys + NetlistSVG (aliased as `arch`) |
