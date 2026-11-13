@@ -23,7 +23,7 @@ begin
         case operation is
             when ADD =>
                 result_value := std_logic_vector(unsigned(input1) + unsigned(input2));
-            when SUB =>
+            when OP_SUB =>
                 result_value := std_logic_vector(unsigned(input1) - unsigned(input2));
             when MUL =>
                 result_value := std_logic_vector(resize(unsigned(input1) * unsigned(input2), 32));
@@ -53,13 +53,13 @@ begin
                 else
                     result_value := std_logic_vector(unsigned(input1) mod unsigned(input2));
                 end if;
-            when AND_ =>
+            when OP_AND =>
                 result_value := input1 and input2;
-            when OR_ =>
+            when OP_OR =>
                 result_value := input1 or input2;
-            when NAND_ =>
+            when OP_NAND =>
                 result_value := input1 nand input2;
-            when XOR_ =>
+            when OP_XOR =>
                 result_value := input1 xor input2;
             when SLLI | SLL_OP =>
                 result_value := std_logic_vector(shift_left(unsigned(input1), shift_amount));

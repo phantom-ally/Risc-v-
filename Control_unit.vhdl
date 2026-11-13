@@ -46,7 +46,7 @@ begin
                 reg_write <= '1';
                 case func3 is
                     when "000" =>
-                        if func7 = "0100000" then op := SUB;
+                        if func7 = "0100000" then op := OP_SUB;
                         elsif func7 = "0000001" then op := MUL;
                         elsif func7 = "0000000" then op := ADD;
                         else reg_write <= '0';
@@ -64,7 +64,7 @@ begin
                         else reg_write <= '0';
                         end if;
                     when "100" =>
-                        if func7 = "0000000" then op := XOR_;
+                        if func7 = "0000000" then op := OP_XOR;
                         elsif func7 = "0000001" then op := DIV;
                         else reg_write <= '0';
                         end if;
@@ -75,12 +75,12 @@ begin
                         else reg_write <= '0';
                         end if;
                     when "110" =>
-                        if func7 = "0000000" then op := OR_;
+                        if func7 = "0000000" then op := OP_OR;
                         elsif func7 = "0000001" then op := MOD_OP;
                         else reg_write <= '0';
                         end if;
                     when "111" =>
-                        if func7 = "0000000" then op := AND_;
+                        if func7 = "0000000" then op := OP_AND;
                         elsif func7 = "0000001" then op := REMU;
                         else reg_write <= '0';
                         end if;
@@ -93,9 +93,9 @@ begin
                     when "000" => op := ADD;
                     when "010" => op := SLT;
                     when "011" => op := SLTU;
-                    when "100" => op := XOR_;
-                    when "110" => op := OR_;
-                    when "111" => op := AND_;
+                    when "100" => op := OP_XOR;
+                    when "110" => op := OP_OR;
+                    when "111" => op := OP_AND;
                     when "001" =>
                         if func7 = "0000000" then op := SLLI;
                         else reg_write <= '0';
