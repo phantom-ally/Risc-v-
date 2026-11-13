@@ -4,3 +4,9 @@ top_level
 *.dot
 *.svg
 *.png
+*.ghw
+*.vcd
+*.json
+yosys_stats.txt
+*.o
+*.cf

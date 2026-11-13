@@ -11,7 +11,15 @@ end entity Instruction_mm;
 
 architecture model of Instruction_mm is
     type memory_type is array (0 to 1023) of std_logic_vector(7 downto 0);
-    signal memory : memory_type := (others => (others => '0'));
+    signal memory : memory_type := (
+        -- 0x00: mov r1,12h (0x01200093)
+        0 => x"93", 1 => x"00", 2 => x"20", 3 => x"01",
+        -- 0x04: mov r2,13h (0x01300113)
+        4 => x"13", 5 => x"01", 6 => x"30", 7 => x"01",
+        -- 0x08: add r1,r2 (0x002080B3)
+        8 => x"B3", 9 => x"80", 10 => x"20", 11 => x"00",
+        others => (others => '0')
+    );
 begin
     process(Instruction_add, memory)
         variable addr : integer;
