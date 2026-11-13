@@ -1,0 +1,61 @@
+correcting instructions 
+to add a control unit in it 
+to add more instructions in it 
+to decrease the time complexity
+
+Reasons for the code changes:
+
+1. Follow the supplied RISC-V architecture:
+   - Keep instruction memory and fetch separate from decode.
+   - Decode feeds the control unit and the register file.
+   - Register operands feed the ALU, branch control, and data memory.
+   - The ALU result selects data-memory addresses; load data or the ALU
+     result is written back to the register file.
+   - Put reset, PC+4, branch, jump, and JALR next-PC selection in a
+     separate PC_logic block, matching the diagram's Reset and PC logic.
+   - Keep the design single-cycle; do not add pipeline stages that are not
+     present in the supplied architecture.
+
+2. Make the VHDL compile consistently:
+   - Correct misspelled VHDL types, missing semicolons, incomplete ports,
+     invalid package bodies, and mismatched package names.
+   - Rename identifiers that conflict with VHDL operators/keywords.
+   - Use consistent entity port names, widths, and directions between
+     modules and the top-level port maps.
+   - Use explicit process sensitivity lists rather than VHDL-2008
+     process(all), so the RTL remains suitable for older Cadence tools
+     configured for VHDL-93.
+
+3. Decode valid RISC-V instruction fields:
+   - Correctly reconstruct and sign-extend I-, S-, B-, and J-type
+     immediates; form U-type immediates with twelve low zero bits.
+   - Give decoder outputs defaults on every path so an unsupported
+     instruction cannot leave stale register or control fields.
+   - Decode the operation using opcode, funct3, and funct7 together;
+     opcode alone does not distinguish all ALU operations.
+
+4. Make the datapath behavior correct:
+   - Size the multiply result to the 32-bit datapath and return a 0/1
+     result for signed and unsigned comparisons.
+   - Implement signed/unsigned division and remainder, arithmetic shifts,
+     and defined divide-by-zero results without simulator divide errors.
+   - Make register x0 read as zero and ignore writes to x0.
+   - Preserve little-endian byte order in data memory and sign-extend or
+     zero-extend byte/half-word loads according to the load instruction.
+   - Check the memory bounds before multi-byte reads/writes; for example,
+     a word access at the last byte must not index beyond the RAM array.
+   - Reset the PC and suppress memory requests during reset.
+
+5. Connect instruction control and writeback:
+   - Add control outputs for register writes, loads/stores, ALU inputs,
+     branches, jumps, byte widths, and signed/unsigned loads.
+   - Use PC+4 as the JAL/JALR link value; use the branch/jump target for
+     the next PC and clear bit zero for JALR.
+   - Default unused/invalid controls to inactive values to prevent
+     accidental writes or memory requests.
+
+6. Design limits to keep in mind:
+   - The instruction memory is initialized to zero, so load your
+     instruction program into its memory initialization before simulation.
+   - This is a single-cycle integer datapath; exceptions, CSRs, interrupts,
+     and misalignment traps are not implemented.
