@@ -1,3 +1,6 @@
 *.o
 *.cf
 top_level
+*.dot
+*.svg
+*.png

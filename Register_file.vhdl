@@ -52,4 +52,16 @@ begin
             data2 <= reg_mm(r2_index);
         end if;
     end process;
+
+    -- synthesis translate_off
+    process
+    begin
+        wait for 95 ns;
+        for i in 0 to 31 loop
+            report "REG_VAL:" & integer'image(i) & ":" & integer'image(to_integer(signed(reg_mm(i)))) & ":" & to_hstring(reg_mm(i));
+        end loop;
+        wait;
+    end process;
+    -- synthesis translate_on
 end architecture behavior;
+
