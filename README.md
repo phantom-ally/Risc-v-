@@ -66,9 +66,6 @@ python3 draw_arch.py
 ./show_arch.sh
 (Optional) Add a shell shortcut so you can run it anytime by typing arch:
 echo 'alias arch="$(pwd)/show_arch.sh"' >> ~/.zshrc && source ~/.zshrc
-
-
-Repository Structure
 ├── Risc_5pkg.vhdl           # Custom ALU operation and data-size type packages
 ├── Top_level.vhdl           # Top-level processor structural wiring
 ├── PC_logic.vhdl            # Program Counter and branch/jump target logic
@@ -84,3 +81,4 @@ Repository Structure
 ├── demo.py                  # Interactive RV32I assembler & GHDL simulation runner
 ├── draw_arch.py             # Graphviz textbook block diagram generator
 └── show_arch.sh             # Live schematic generator (aliased as `arch`)
+
