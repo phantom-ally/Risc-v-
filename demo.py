@@ -12,16 +12,35 @@ REG_MAP.update({
 })
 
 R_TYPES = {
-    "add":  (0b0000000, 0b000), "sub":  (0b0100000, 0b000),
-    "sll":  (0b0000000, 0b001), "slt":  (0b0000000, 0b010),
-    "sltu": (0b0000000, 0b011), "xor":  (0b0000000, 0b100),
-    "srl":  (0b0000000, 0b101), "sra":  (0b0100000, 0b101),
-    "or":   (0b0000000, 0b110), "and":  (0b0000000, 0b111),
+    "add":    (0b0000000, 0b000), "sub":    (0b0100000, 0b000),
+    "sll":    (0b0000000, 0b001), "slt":    (0b0000000, 0b010),
+    "sltu":   (0b0000000, 0b011), "xor":    (0b0000000, 0b100),
+    "srl":    (0b0000000, 0b101), "sra":    (0b0100000, 0b101),
+    "or":     (0b0000000, 0b110), "and":    (0b0000000, 0b111),
+    "mul":    (0b0000001, 0b000), "mulh":   (0b0000001, 0b001),
+    "mulhsu": (0b0000001, 0b010), "mulhu":  (0b0000001, 0b011),
+    "div":    (0b0000001, 0b100), "divu":   (0b0000001, 0b101),
+    "rem":    (0b0000001, 0b110), "remu":   (0b0000001, 0b111),
 }
 
 I_TYPES = {
     "addi": 0b000, "slti": 0b010, "sltiu": 0b011,
     "xori": 0b100, "ori":  0b110, "andi":  0b111,
+}
+
+LOAD_TYPES = {
+    "lb":  0b000, "lh":  0b001, "lw":  0b010,
+    "lbu": 0b100, "lhu": 0b101,
+}
+
+STORE_TYPES = {
+    "sb": 0b000, "sh": 0b001, "sw": 0b010,
+}
+
+BRANCH_TYPES = {
+    "beq":  0b000, "bne":  0b001,
+    "blt":  0b100, "bge":  0b101,
+    "bltu": 0b110, "bgeu": 0b111,
 }
 
 def parse_reg(tok):
@@ -36,23 +55,42 @@ def parse_imm(tok):
         return int(tok[:-1], 16)
     return int(tok, 0)
 
+def parse_mem_operand(tok):
+    m = re.match(r"(-?(?:0x)?[0-9a-fA-FhH]+)\(([^)]+)\)", tok.strip())
+    if not m:
+        raise ValueError(f"Invalid memory operand '{tok}', expected offset(reg)")
+    return parse_imm(m.group(1)) & 0xFFF, parse_reg(m.group(2))
+
+def encode_u(imm20, rd, opcode):
+    return ((imm20 & 0xFFFFF) << 12) | (rd << 7) | opcode
+
+def encode_i(imm12, rs1, f3, rd, opcode):
+    return ((imm12 & 0xFFF) << 20) | (rs1 << 15) | (f3 << 12) | (rd << 7) | opcode
+
 def assemble_line(line):
     line = line.split("#")[0].split("//")[0].strip()
     if not line or line.lower() == "nop":
-        return 0x00000013, None
+        return [(0x00000013, None, "nop")]
+
     parts = [p for p in re.split(r"[\s,]+", line) if p]
     op = parts[0].lower()
 
-    # Support 8086/ARM-style "mov r1, 12h" or "mov r1, r2"
     if op in ("mov", "li", "mv"):
         rd = parse_reg(parts[1])
         if parts[2].strip().lower() in REG_MAP:
             rs1 = parse_reg(parts[2])
-            return ((0 << 20) | (rs1 << 15) | (0b000 << 12) | (rd << 7) | 0b0010011), rd
-        imm = parse_imm(parts[2]) & 0xFFF
-        return ((imm << 20) | (0 << 15) | (0b000 << 12) | (rd << 7) | 0b0010011), rd
+            return [(encode_i(0, rs1, 0b000, rd, 0b0010011), rd, line)]
+        val = parse_imm(parts[2])
+        if -2048 <= val <= 2047:
+            return [(encode_i(val, 0, 0b000, rd, 0b0010011), rd, line)]
+        val32 = val & 0xFFFFFFFF
+        lo = val32 & 0xFFF
+        hi = ((val32 + 0x800) >> 12) & 0xFFFFF
+        return [
+            (encode_u(hi, rd, 0b0110111), rd, f"lui {parts[1]}, 0x{hi:X}"),
+            (encode_i(lo, rd, 0b000, rd, 0b0010011), rd, f"addi {parts[1]}, {parts[1]}, {lo - 4096 if lo >= 2048 else lo}"),
+        ]
 
-    # Support 2-operand "add r1, r2" -> "add r1, r1, r2" as well as 3-operand "add x1, x1, x2"
     if op in R_TYPES:
         f7, f3 = R_TYPES[op]
         if len(parts) == 3:
@@ -60,65 +98,116 @@ def assemble_line(line):
             rs2 = parse_reg(parts[2])
         else:
             rd, rs1, rs2 = parse_reg(parts[1]), parse_reg(parts[2]), parse_reg(parts[3])
-        return ((f7 << 25) | (rs2 << 20) | (rs1 << 15) | (f3 << 12) | (rd << 7) | 0b0110011), rd
+        word = (f7 << 25) | (rs2 << 20) | (rs1 << 15) | (f3 << 12) | (rd << 7) | 0b0110011
+        return [(word, rd, line)]
 
     if op in I_TYPES:
-        rd, rs1, imm = parse_reg(parts[1]), parse_reg(parts[2]), parse_imm(parts[3]) & 0xFFF
-        return ((imm << 20) | (rs1 << 15) | (I_TYPES[op] << 12) | (rd << 7) | 0b0010011), rd
+        rd, rs1, imm = parse_reg(parts[1]), parse_reg(parts[2]), parse_imm(parts[3])
+        return [(encode_i(imm, rs1, I_TYPES[op], rd, 0b0010011), rd, line)]
 
     if op in ("slli", "srli", "srai"):
         rd, rs1, shamt = parse_reg(parts[1]), parse_reg(parts[2]), parse_imm(parts[3]) & 0x1F
         f3 = 0b001 if op == "slli" else 0b101
         f7 = 0b0100000 if op == "srai" else 0b0000000
-        return ((f7 << 25) | (shamt << 20) | (rs1 << 15) | (f3 << 12) | (rd << 7) | 0b0010011), rd
+        word = (f7 << 25) | (shamt << 20) | (rs1 << 15) | (f3 << 12) | (rd << 7) | 0b0010011
+        return [(word, rd, line)]
 
-    if op == "lw":
+    if op in ("lui", "auipc"):
+        rd, imm20 = parse_reg(parts[1]), parse_imm(parts[2])
+        opcode = 0b0110111 if op == "lui" else 0b0010111
+        return [(encode_u(imm20, rd, opcode), rd, line)]
+
+    if op in LOAD_TYPES:
         rd = parse_reg(parts[1])
-        m = re.match(r"(-?(?:0x)?[0-9a-fA-FhH]+)\(([^)]+)\)", parts[2])
-        imm, rs1 = parse_imm(m.group(1)) & 0xFFF, parse_reg(m.group(2))
-        return ((imm << 20) | (rs1 << 15) | (0b010 << 12) | (rd << 7) | 0b0000011), rd
+        imm, rs1 = parse_mem_operand(parts[2])
+        return [(encode_i(imm, rs1, LOAD_TYPES[op], rd, 0b0000011), rd, line)]
 
-    if op == "sw":
+    if op in STORE_TYPES:
         rs2 = parse_reg(parts[1])
-        m = re.match(r"(-?(?:0x)?[0-9a-fA-FhH]+)\(([^)]+)\)", parts[2])
-        imm, rs1 = parse_imm(m.group(1)) & 0xFFF, parse_reg(m.group(2))
-        return (((imm >> 5) & 0x7F) << 25) | (rs2 << 20) | (rs1 << 15) | (0b010 << 12) | ((imm & 0x1F) << 7) | 0b0100011, None
+        imm, rs1 = parse_mem_operand(parts[2])
+        word = (((imm >> 5) & 0x7F) << 25) | (rs2 << 20) | (rs1 << 15) | (STORE_TYPES[op] << 12) | ((imm & 0x1F) << 7) | 0b0100011
+        return [(word, None, line)]
+
+    if op in BRANCH_TYPES:
+        rs1, rs2, imm = parse_reg(parts[1]), parse_reg(parts[2]), parse_imm(parts[3])
+        f3 = BRANCH_TYPES[op]
+        word = (
+            (((imm >> 12) & 1) << 31)
+            | (((imm >> 5) & 0x3F) << 25)
+            | (rs2 << 20)
+            | (rs1 << 15)
+            | (f3 << 12)
+            | (((imm >> 1) & 0xF) << 8)
+            | (((imm >> 11) & 1) << 7)
+            | 0b1100011
+        )
+        return [(word, None, line)]
+
+    if op == "jal":
+        if len(parts) == 2:
+            rd, imm = 1, parse_imm(parts[1])
+        else:
+            rd, imm = parse_reg(parts[1]), parse_imm(parts[2])
+        word = (
+            (((imm >> 20) & 1) << 31)
+            | (((imm >> 1) & 0x3FF) << 21)
+            | (((imm >> 11) & 1) << 20)
+            | (((imm >> 12) & 0xFF) << 12)
+            | (rd << 7)
+            | 0b1101111
+        )
+        return [(word, rd, line)]
+
+    if op == "jalr":
+        if len(parts) == 2:
+            rd, rs1, imm = 1, parse_reg(parts[1]), 0
+        elif len(parts) == 3 and "(" in parts[2]:
+            rd = parse_reg(parts[1])
+            imm, rs1 = parse_mem_operand(parts[2])
+        else:
+            rd, rs1, imm = parse_reg(parts[1]), parse_reg(parts[2]), parse_imm(parts[3])
+        return [(encode_i(imm, rs1, 0b000, rd, 0b1100111), rd, line)]
 
     raise ValueError(f"Unsupported instruction '{op}'")
 
 print("==========================================================")
-print("  RV32I VHDL Processor - Interactive Live Execution Demo  ")
+print("  RV32IM VHDL Processor - Interactive Live Execution Demo ")
 print("==========================================================")
-print("Enter assembly commands (supports both RISC-V & mov/2-op syntax).")
+print("Enter assembly commands (supports RV32IM, semicolons ';', & mov/2-op syntax).")
 print("Type 'run' when ready:\n")
 
-lines, touched = [], set()
+compiled_words, touched = [], set()
 while True:
     try:
-        inp = input("RV32I> ").strip()
+        inp = input("RV32IM> ").strip()
     except EOFError:
         break
     if inp.lower() == "run":
         break
-    if inp:
+    if not inp:
+        continue
+    for stmt in inp.split(";"):
+        stmt = stmt.strip()
+        if not stmt:
+            continue
         try:
-            _, rd = assemble_line(inp)
-            lines.append(inp)
-            if rd:
-                touched.add(rd)
+            items = assemble_line(stmt)
+            for word, rd, label in items:
+                compiled_words.append((word, label))
+                if rd:
+                    touched.add(rd)
         except Exception as e:
-            print(f"  [Syntax Error] {e}")
+            print(f"  [Syntax Error in '{stmt}'] {e}")
 
-if not lines:
+if not compiled_words:
     sys.exit(0)
 
 mem_entries = []
-print("\n[1/3] Assembling into 32-bit RV32I Machine Code (Little-Endian):")
-for idx, asm in enumerate(lines):
-    word, _ = assemble_line(asm)
+print("\n[1/3] Assembling into 32-bit RV32IM Machine Code (Little-Endian):")
+for idx, (word, asm) in enumerate(compiled_words):
     addr = idx * 4
     b0, b1, b2, b3 = word & 0xFF, (word >> 8) & 0xFF, (word >> 16) & 0xFF, (word >> 24) & 0xFF
-    print(f"  PC=0x{addr:02X} | {asm:<22} -> 0x{word:08X}  (bytes: {b0:02X} {b1:02X} {b2:02X} {b3:02X})")
+    print(f"  PC=0x{addr:02X} | {asm:<26} -> 0x{word:08X}  (bytes: {b0:02X} {b1:02X} {b2:02X} {b3:02X})")
     mem_entries.append(
         f'        -- 0x{addr:02X}: {asm} (0x{word:08X})\n'
         f'        {addr} => x"{b0:02X}", {addr+1} => x"{b1:02X}", {addr+2} => x"{b2:02X}", {addr+3} => x"{b3:02X}",'
